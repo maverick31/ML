@@ -1,0 +1,75 @@
+
+Practical Machine Learning R Project
+====================
+
+The aim of this project is to predict the manner in which a person will exercise using data from accelerometers on the belt, forearm, arm, and dumbbell of 6 participants to.  The algorithm usied for this exercise is a random forest prediction model.
+
+
+Loading and cleaning dataset
+---------
+The first step is to load in the training data and subset it into a training and a validation dataset. Training data is divided into training and validation dataset to give an unbiased estimate of the prediction model before the model has to classify on the actual test set.Now since the first 7 columns were related to Identity, they were removed.Also as there are a lot of NA values in the dataset, all those variables were removed having NA values fraction smaller than 0.8.
+
+```{r,echo=TRUE,results='hold'}
+training <- read.table("pml-training.csv", header = TRUE, sep = ",",na.strings=c("NA",""))
+testing<-read.table("pml-testing.csv",header=TRUE,sep=",",na.strings=c("NA",""))
+
+training<-training[,8:160]
+varcompleteness <- apply(training, 2, function(x) 1 - (sum(is.na(x))/length(x)))
+training1<-training[,varcompleteness>0.8]
+```
+
+
+Loading Packages
+------------------------
+Following packages were loaded.
+```{r, echo=TRUE,results='hold'}
+library(caret)
+library(rpart)
+library(randomForest)
+set.seed(12345)
+```
+
+Creating Validation and training dataset and Checking Variable Importance
+------------------------
+Training data was divided into trianing and cross validation data set.The training data was further subset to know the importance of the variable.From the plot of variable importance we can easily see that only 16 variables have importance of more than 20%.Hence we will be considering only those variables. 
+
+```{r,echo=TRUE,results='hold'}
+
+trainset <- createDataPartition(y = training1$classe, p = 0.6, list = F)
+traindata<-training1[trainset,]
+cv<-training1[-trainset,]
+trainVarImp <- createDataPartition(y = traindata$classe, p = 0.1, list = F)
+trainVarImpset<-traindata[trainVarImp,]
+VARIMP<-train(classe~.,data=trainVarImpset,method="rf")
+ImpObj<-varImp(VARIMP)
+```
+
+```{r,echo=TRUE}
+plot(ImpObj,main="Variable Importance")
+```
+
+Modelling Random forest with variable having importance greater than 20%.
+-----------------------------------
+Building random forest prediction with varibale having importance greater than 20%
+```{r,echo=TRUE,results='hold'}
+varfilter<-ImpObj$importance[, 1] >= 20
+finaltrain<-traindata[,varfilter]
+rfModel <- train(classe ~ ., data = finaltrain, method = "rf")
+```
+
+Calculating Out of sample error
+------------------------------
+finally model was implemented on validation set and a confusion matrix was observed with out of sample error observed to be around 1.38%.
+
+```{r,echo=TRUE,results='hold'}
+finaltest<-cv[,varfilter]
+predicted<-predict(rfModel,finaltest)
+confusionMatrix(predicted,cv$classe)
+ missClass = function(values, prediction) {
+     sum(prediction != values)/length(values)}
+
+missClass(finaltest$classe, predicted)
+```
+
+
+
